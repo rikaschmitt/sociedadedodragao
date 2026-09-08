@@ -7,5 +7,10 @@
   },
   "sorteio": {
     "mensagemSorteado": "Sorteio feito.. Sorteado foi: "
+  },
+  "mensagens": {
+    "msgRecrutamento": "mensagem de recrutamento",
+    "msgGuildMission": "mensagem de guild mission",
+    "msgReset": "mensaem de reset"
   }
 }
