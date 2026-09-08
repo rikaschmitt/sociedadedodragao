@@ -4,5 +4,8 @@
     "imagem": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/calendario.png",
     "periodoCalendario": "07/09 a 13/09",
     "ultimaAtualizacao": "08/09/2026"
+  },
+  "sorteio": {
+    "mensagemSorteado": "Sorteio feito.. Sorteado foi: "
   }
 }
