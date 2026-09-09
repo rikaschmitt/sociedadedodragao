@@ -1,5 +1,7 @@
-﻿using System;
+﻿
+using System;
 using System.ComponentModel.Composition;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -87,6 +89,16 @@ namespace SociedadeDoDragao
         private string _quickMessageGuildMission = string.Empty;
         private string _quickMessageReset = string.Empty;
 
+        // Mensagem do Dia.
+        private StandardWindow _dailyMessageWindow;
+        private Image _dailyMessageImage;
+        private AsyncTexture2D _dailyMessageTexture;
+        private Texture2D _dailyMessageRawTexture;
+        private readonly Random _dailyMessageRandom = new Random();
+
+        private SettingEntry<string> _dailyMessageDateSetting;
+        private SettingEntry<int> _dailyMessageImageSetting;
+
         // Sorteador de Participantes.
         private StandardWindow _raffleWindow;
         private readonly TextBox[] _raffleInputs = new TextBox[18];
@@ -171,6 +183,8 @@ namespace SociedadeDoDragao
             public RaffleConfig sorteio { get; set; }
 
             public QuickMessagesConfig mensagens { get; set; }
+
+            public Dictionary<string, string> msgDia { get; set; }
         }
 
         private class QuickMessagesConfig
@@ -206,6 +220,20 @@ namespace SociedadeDoDragao
         protected override void DefineSettings(
             SettingCollection settings)
         {
+            // Guarda localmente qual imagem foi escolhida para o dia.
+            // Assim, todos os cliques no mesmo dia mostram a mesma mensagem,
+            // mesmo depois de fechar e reabrir o Blish HUD.
+            _dailyMessageDateSetting =
+                settings.DefineSetting(
+                    "MensagemDoDia_Data",
+                    string.Empty
+                );
+
+            _dailyMessageImageSetting =
+                settings.DefineSetting(
+                    "MensagemDoDia_Imagem",
+                    0
+                );
         }
 
         protected override async Task LoadAsync()
@@ -265,6 +293,16 @@ namespace SociedadeDoDragao
                 }
 
                 _ = LoadCalendarAsync();
+            };
+
+            var dailyMessageMenuItem =
+                _guildMenu.AddMenuItem(
+                    "Mensagem do Dia"
+                );
+
+            dailyMessageMenuItem.Click += (sender, e) =>
+            {
+                ShowDailyMessageWindow();
             };
 
             // Separador visual entre as funcionalidades gerais e os
@@ -1776,6 +1814,446 @@ namespace SociedadeDoDragao
                 _calendarStatus.Text =
                     "Última atualização: não foi possível carregar o calendário.";
             }
+        }
+
+        // ============================================================
+        // MENSAGEM DO DIA
+        // ============================================================
+
+        private void ShowDailyMessageWindow()
+        {
+            if (_dailyMessageWindow == null)
+            {
+                CreateDailyMessageWindow();
+            }
+
+            _dailyMessageWindow.Show();
+            _ = LoadDailyMessageAsync();
+        }
+
+        private void CreateDailyMessageWindow()
+        {
+            int screenWidth =
+                GameService.Graphics.SpriteScreen.Width;
+
+            int screenHeight =
+                GameService.Graphics.SpriteScreen.Height;
+
+            const int windowWidth = 660;
+            const int windowHeight = 680;
+
+            var windowBackground =
+                AsyncTexture2D.FromAssetId(155985);
+
+            _dailyMessageWindow =
+                new StandardWindow(
+                    windowBackground,
+                    new Rectangle(
+                        25,
+                        26,
+                        900,
+                        700
+                    ),
+                    new Rectangle(
+                        40,
+                        50,
+                        880,
+                        650
+                    ),
+                    new Point(
+                        windowWidth,
+                        windowHeight
+                    ))
+                {
+                    Parent =
+                        GameService.Graphics.SpriteScreen,
+
+                    Title =
+                        "Mensagem do Dia",
+
+                    Subtitle =
+                        "Sociedade do Dragão [BR]",
+
+                    Emblem =
+                        _iconTexture,
+
+                    Location =
+                        new Point(
+                            Math.Max(
+                                0,
+                                (screenWidth - windowWidth) / 2
+                            ),
+                            Math.Max(
+                                0,
+                                (screenHeight - windowHeight) / 2
+                            )
+                        ),
+
+                    CanResize =
+                        true,
+
+                    SavesSize =
+                        true,
+
+                    SavesPosition =
+                        true,
+
+                    Id =
+                        "SociedadeDoDragao_MensagemDoDia"
+                };
+
+            _dailyMessageImage =
+                new Image
+                {
+                    Location =
+                        new Point(
+                            30,
+                            30
+                        ),
+
+                    Size =
+                        new Point(
+                            600,
+                            600
+                        ),
+
+                    Parent =
+                        _dailyMessageWindow,
+
+                    ZIndex =
+                        10
+                };
+
+            _dailyMessageWindow.Resized +=
+                (sender, e) =>
+                {
+                    FitDailyMessageImage();
+                };
+        }
+
+        private async Task LoadDailyMessageAsync()
+        {
+            try
+            {
+
+                string json = null;
+                Exception lastException = null;
+
+                const int maxAttempts = 3;
+
+                for (int attempt = 1; attempt <= maxAttempts; attempt++)
+                {
+                    try
+                    {
+                        Logger.Info(
+                            $"Tentativa {attempt}/{maxAttempts} para carregar a Mensagem do Dia..."
+                        );
+
+                        json =
+                            await _httpClient.GetStringAsync(
+                                ConfigUrl
+                            );
+
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastException = ex;
+
+                        Logger.Warn(
+                            $"Falha ao carregar a Mensagem do Dia na tentativa {attempt}/{maxAttempts}: {ex.Message}"
+                        );
+
+                        if (attempt < maxAttempts)
+                        {
+                            await Task.Delay(
+                                TimeSpan.FromSeconds(attempt)
+                            );
+                        }
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    throw new Exception(
+                        $"Não foi possível carregar o config.json: {lastException?.Message}"
+                    );
+                }
+
+                var config =
+                    JsonConvert.DeserializeObject<RemoteConfig>(
+                        json
+                    );
+
+                if (
+                    config?.msgDia == null ||
+                    config.msgDia.Count == 0
+                )
+                {
+                    throw new Exception(
+                        "Nenhuma imagem foi encontrada em msgDia."
+                    );
+                }
+
+                string today =
+                    GetBrazilTime().ToString(
+                        "yyyy-MM-dd"
+                    );
+
+                int selectedImageNumber =
+                    GetDailyMessageImageNumber(
+                        today,
+                        config.msgDia
+                    );
+
+                string imageUrl = null;
+
+                if (
+                    !config.msgDia.TryGetValue(
+                        selectedImageNumber.ToString(),
+                        out imageUrl
+                    ) ||
+                    string.IsNullOrWhiteSpace(imageUrl)
+                )
+                {
+                    // Caso o número salvo não exista mais no config,
+                    // escolhe uma nova imagem para o dia.
+                    selectedImageNumber =
+                        SelectNewDailyMessageImage(
+                            config.msgDia
+                        );
+
+                    imageUrl =
+                        config.msgDia[
+                            selectedImageNumber.ToString()
+                        ];
+
+                    _dailyMessageDateSetting.Value =
+                        today;
+
+                    _dailyMessageImageSetting.Value =
+                        selectedImageNumber;
+                }
+
+                Logger.Info(
+                    $"Mensagem do Dia selecionada: {selectedImageNumber} - {imageUrl}"
+                );
+
+                byte[] imageBytes = null;
+                Exception lastImageException = null;
+
+                for (int attempt = 1; attempt <= maxAttempts; attempt++)
+                {
+                    try
+                    {
+                        Logger.Info(
+                            $"Tentativa {attempt}/{maxAttempts} para carregar a imagem da Mensagem do Dia..."
+                        );
+
+                        imageBytes =
+                            await _httpClient.GetByteArrayAsync(
+                                imageUrl
+                            );
+
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastImageException = ex;
+
+                        Logger.Warn(
+                            $"Falha ao carregar imagem da Mensagem do Dia na tentativa {attempt}/{maxAttempts}: {ex.Message}"
+                        );
+
+                        if (attempt < maxAttempts)
+                        {
+                            await Task.Delay(
+                                TimeSpan.FromSeconds(attempt)
+                            );
+                        }
+                    }
+                }
+
+                if (
+                    imageBytes == null ||
+                    imageBytes.Length == 0
+                )
+                {
+                    throw new Exception(
+                        $"Não foi possível carregar a imagem: {lastImageException?.Message}"
+                    );
+                }
+
+                var imageStream =
+                    new System.IO.MemoryStream(
+                        imageBytes
+                    );
+
+                GameService.Graphics.QueueMainThreadRender(
+                    graphicsDevice =>
+                    {
+                        try
+                        {
+                            var texture =
+                                Texture2D.FromStream(
+                                    graphicsDevice,
+                                    imageStream
+                                );
+
+                            _dailyMessageRawTexture?.Dispose();
+
+                            _dailyMessageRawTexture =
+                                texture;
+
+                            _dailyMessageTexture =
+                                new AsyncTexture2D(
+                                    texture
+                                );
+
+                            _dailyMessageImage.Texture =
+                                _dailyMessageTexture;
+
+                            FitDailyMessageImage();
+
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Warn(
+                                $"Erro ao criar textura da Mensagem do Dia: {ex.Message}"
+                            );
+
+                        }
+                        finally
+                        {
+                            imageStream.Dispose();
+                        }
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(
+                    $"Erro ao carregar a Mensagem do Dia: {ex.Message}"
+                );
+
+            }
+        }
+
+        private int GetDailyMessageImageNumber(
+            string today,
+            Dictionary<string, string> messages)
+        {
+            int savedImage =
+                _dailyMessageImageSetting?.Value ?? 0;
+
+            string savedDate =
+                _dailyMessageDateSetting?.Value ?? string.Empty;
+
+            // A escolha de hoje já foi registrada: mantém exatamente
+            // a mesma imagem durante todo o dia.
+            if (
+                savedDate == today &&
+                savedImage > 0 &&
+                messages.ContainsKey(
+                    savedImage.ToString()
+                )
+            )
+            {
+                return savedImage;
+            }
+
+            int selectedImage =
+                SelectNewDailyMessageImage(
+                    messages
+                );
+
+            _dailyMessageDateSetting.Value =
+                today;
+
+            _dailyMessageImageSetting.Value =
+                selectedImage;
+
+            return selectedImage;
+        }
+
+        private int SelectNewDailyMessageImage(
+            Dictionary<string, string> messages)
+        {
+            var validKeys =
+                new List<int>();
+
+            foreach (string key in messages.Keys)
+            {
+                int number;
+
+                if (
+                    int.TryParse(
+                        key,
+                        out number
+                    ) &&
+                    number > 0 &&
+                    !string.IsNullOrWhiteSpace(
+                        messages[key]
+                    )
+                )
+                {
+                    validKeys.Add(number);
+                }
+            }
+
+            if (validKeys.Count == 0)
+            {
+                throw new Exception(
+                    "msgDia não possui nenhuma chave numérica válida."
+                );
+            }
+
+            int previousImage =
+                _dailyMessageImageSetting?.Value ?? 0;
+
+            // Evita repetir a mensagem anterior quando houver
+            // mais de uma imagem disponível.
+            var availableKeys =
+                validKeys.FindAll(
+                    number =>
+                        validKeys.Count == 1 ||
+                        number != previousImage
+                );
+
+            int index =
+                _dailyMessageRandom.Next(
+                    availableKeys.Count
+                );
+
+            return availableKeys[index];
+        }
+
+        private void FitDailyMessageImage()
+        {
+            if (
+                _dailyMessageWindow == null ||
+                _dailyMessageImage == null
+            )
+            {
+                return;
+            }
+
+            // As artes da Mensagem do Dia são padronizadas em 800x800
+            // e são exibidas sempre em 600x600, sem redimensionamento
+            // conforme a janela.
+            _dailyMessageImage.Size =
+                new Point(
+                    600,
+                    600
+                );
+
+            // A janela foi dimensionada para deixar uma margem de
+            // aproximadamente 30 px em cada lado da imagem.
+            _dailyMessageImage.Location =
+                new Point(
+                    30,
+                    30
+                );
         }
 
         // ============================================================
@@ -3296,6 +3774,14 @@ namespace SociedadeDoDragao
             _quickMessageRecruitment = string.Empty;
             _quickMessageGuildMission = string.Empty;
             _quickMessageReset = string.Empty;
+            _dailyMessageWindow?.Dispose();
+            _dailyMessageWindow = null;
+            _dailyMessageImage = null;
+            _dailyMessageTexture = null;
+            _dailyMessageRawTexture?.Dispose();
+            _dailyMessageRawTexture = null;
+            _dailyMessageDateSetting = null;
+            _dailyMessageImageSetting = null;
             _raffleWindow = null;
             _raffleResultLabel = null;
             _raffleWinnerLabel = null;
