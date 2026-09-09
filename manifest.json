@@ -1,0 +1,16 @@
+{
+  "manifest_version": 1,
+  "name": "Sociedade do Dragão",
+  "namespace": "sociedade_do_dragao",
+  "version": "1.0.0",
+  "package": "SociedadeDoDragao.dll",
+  "contributors": [
+    {
+      "name": "Sociedade do Dragão [BR]"
+    }
+  ],
+  "description": "Módulo da guilda Sociedade do Dragão [BR] para Guild Wars 2, com ferramentas úteis para os membros e também para a staff. | Guild module for the Sociedade do Dragão [BR] guild in Guild Wars 2, with useful tools for members and staff alike.",
+  "dependencies": {
+    "bh.blishhud": ">=1.3.0"
+  }
+}
