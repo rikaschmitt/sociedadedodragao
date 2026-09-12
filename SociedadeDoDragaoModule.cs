@@ -13,6 +13,7 @@ using Blish_HUD.Controls;
 using Blish_HUD.Modules;
 using Blish_HUD.Modules.Managers;
 using Blish_HUD.Settings;
+using Blish_HUD.Graphics.UI;
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -38,11 +39,24 @@ namespace SociedadeDoDragao
 
         private AsyncTexture2D _iconTexture;
         private AsyncTexture2D _calendarTexture;
+        private AsyncTexture2D _calendarTabIcon;
 
         private CornerIcon _cornerIcon;
         private ContextMenuStrip _guildMenu;
 
-        private StandardWindow _calendarWindow;
+        private TabbedWindow2 _calendarWindow;
+
+        // Janela principal dos recursos da Guild.
+        // _calendarWindow continua sendo usado pelo código do calendário,
+        // mas agora aponta para esta janela única com abas laterais.
+        private TabbedWindow2 _guildResourcesWindow;
+        private Panel _guildTabSidebar;
+        private Tab _guildCalendarTab;
+        private Tab _guildDailyMessageTab;
+        private Label _guildCalendarTabLabel;
+        private Label _guildDailyMessageTabLabel;
+        private Panel _guildCalendarView;
+        private Panel _guildDailyMessageView;
 
         // Área onde o calendário é exibido e movimentado.
         private Panel _calendarViewport;
@@ -62,6 +76,8 @@ namespace SociedadeDoDragao
         private Label _currentTimeLabel;
         private System.Threading.Timer _currentTimeTimer;
 
+        private Image _calendarTitle;
+        private AsyncTexture2D _calendarTitleTexture;
         private Label _calendarPeriod;
         private Label _calendarStatus;
         private Label _calendarWarning;
@@ -77,8 +93,17 @@ namespace SociedadeDoDragao
         private Label _staffPinTitle;
         private Label _staffPinSubtitle;
         private StandardButton _staffPinCloseButton;
-        private ContextMenuStrip _staffMenu;
-        private ContextMenuStripItem _staffMenuItem;
+        // Janela principal dos recursos da Staff, também organizada em abas.
+        private TabbedWindow2 _staffResourcesWindow;
+        private Panel _staffTabSidebar;
+        private Tab _staffRaffleTab;
+        private Tab _staffQuickMessagesTab;
+        private Panel _staffRaffleContent;
+        private Panel _staffQuickMessagesContent;
+        private Label _staffRaffleTabLabel;
+        private Label _staffQuickMessagesTabLabel;
+        private Panel _staffRaffleView;
+        private Panel _staffQuickMessagesView;
 
         // Mensagens rápidas.
         private StandardWindow _quickMessagesWindow;
@@ -123,13 +148,21 @@ namespace SociedadeDoDragao
         private Point _lastMousePosition = Point.Zero;
 
         // Layout.
-        private const int ViewportLeft = 125;
-        private const int ViewportTop = 100;
-        private const int ViewportRight = 20;
-        private const int ViewportBottom = 20;
+        // Layout da janela no estilo das telas nativas do Blish HUD.
+        // A coluna lateral fica dentro do ContentRegion, nunca sobre a moldura.
+        private const int GuildTabSidebarWidth = 190;
+        private const int CalendarContentLeft = 20;
 
-        private const int WeekdayColumnLeft = 10;
-        private const int WeekdayColumnWidth = 105;
+        // Padding uniforme do conteúdo da janela.
+        private const int ContentPadding = 20;
+
+        private const int ViewportLeft = ContentPadding;
+        private const int ViewportTop = 80;
+        private const int ViewportRight = ContentPadding;
+        private const int ViewportBottom = ContentPadding;
+
+        private const int WeekdayColumnLeft = ContentPadding;
+        private const int WeekdayColumnWidth = 95;
 
         // Medidas da nova arte do calendário (2048 x 676).
         // Os cabeçalhos dos dias foram medidos diretamente na imagem.
@@ -157,7 +190,7 @@ namespace SociedadeDoDragao
             (6.0f * CalendarEventCardGap) +
             34.0f;
 
-        private const float CalendarHeaderHeight = 32.0f;
+        private const int CalendarHeaderHeight = 48;
 
         // A linha "Agora" começa centralizada na janela quando o calendário
         // é carregado, permitindo identificar imediatamente o próximo evento.
@@ -252,6 +285,12 @@ namespace SociedadeDoDragao
                     null
                 );
 
+            _calendarTabIcon =
+                ContentsManager.GetTexture(
+                    "icon-calendar.png",
+                    null
+                );
+
             _cornerIcon = new CornerIcon
             {
                 Icon = _iconTexture,
@@ -267,61 +306,30 @@ namespace SociedadeDoDragao
             _guildMenu =
                 new ContextMenuStrip();
 
-            var calendarMenuItem =
+            var guildResourcesMenuItem =
                 _guildMenu.AddMenuItem(
-                    "Calendário Semanal"
+                    "Recursos da Guild"
                 );
 
-            calendarMenuItem.Click += (sender, e) =>
+            guildResourcesMenuItem.Click += (sender, e) =>
             {
-                // Ao abrir o calendário, sempre voltamos a acompanhar
-                // o horário atual, mesmo que o usuário tenha arrastado
-                // a imagem anteriormente.
-                _calendarUserHasDragged = false;
-
-                _calendarWindow.Show();
-
-                // Se a imagem já estiver carregada, reposiciona imediatamente.
-                // No primeiro carregamento, o posicionamento será feito
-                // novamente após a textura e a escala serem calculadas.
-                if (
-                    _calendarOriginalWidth > 0 &&
-                    _calendarOriginalHeight > 0
-                )
-                {
-                    CenterCalendarOnCurrentTime();
-                }
-
-                _ = LoadCalendarAsync();
+                ShowGuildResourcesWindow();
             };
 
-            var dailyMessageMenuItem =
-                _guildMenu.AddMenuItem(
-                    "Mensagem do Dia"
-                );
-
-            dailyMessageMenuItem.Click += (sender, e) =>
-            {
-                ShowDailyMessageWindow();
-            };
-
-            // Separador visual entre as funcionalidades gerais e os
-            // recursos exclusivos da Staff.
-            var staffSeparator =
-                _guildMenu.AddMenuItem(
-                    "------------------"
-                );
-
-            _staffMenuItem =
+            var staffResourcesMenuItem =
                 _guildMenu.AddMenuItem(
                     "Recursos da Staff"
                 );
 
-            _staffMenuItem.Click += (sender, e) =>
+            staffResourcesMenuItem.Click += (sender, e) =>
             {
                 if (!_staffResourcesEnabled)
                 {
                     ShowStaffPinWindow();
+                }
+                else
+                {
+                    ShowStaffResourcesWindow();
                 }
             };
 
@@ -339,17 +347,17 @@ namespace SociedadeDoDragao
                 Math.Max(
                     900,
                     Math.Min(
-                        1200,
-                        (int)(screenWidth * 0.90f)
+                        1300,
+                        (int)(screenWidth * 0.96f)
                     )
                 );
 
             int initialHeight =
                 Math.Max(
-                    650,
+                    900,
                     Math.Min(
-                        850,
-                        (int)(screenHeight * 0.90f)
+                        1100,
+                        (int)(screenHeight * 0.98f)
                     )
                 );
 
@@ -361,19 +369,19 @@ namespace SociedadeDoDragao
                 AsyncTexture2D.FromAssetId(155985);
 
             _calendarWindow =
-                new StandardWindow(
+                new TabbedWindow2(
                     windowBackground,
                     new Rectangle(
-                        25,
+                        40,
                         26,
-                        900,
-                        700
+                        913,
+                        691
                     ),
                     new Rectangle(
-                        40,
-                        50,
-                        880,
-                        650
+                        90,
+                        30,
+                        819,
+                        660
                     ),
                     new Point(
                         initialWidth,
@@ -384,7 +392,7 @@ namespace SociedadeDoDragao
                         GameService.Graphics.SpriteScreen,
 
                     Title =
-                        "Calendário Semanal",
+                        "Recursos da Guild",
 
                     Subtitle =
                         "Sociedade do Dragão [BR]",
@@ -407,19 +415,55 @@ namespace SociedadeDoDragao
                     CanResize =
                         true,
 
-                    SavesSize =
-                        true,
-
                     SavesPosition =
                         true,
 
                     Id =
-                        "SociedadeDoDragao_Calendario"
+                        "SociedadeDoDragao_RecursosGuild"
                 };
+
+            _guildResourcesWindow = _calendarWindow;
+
+            // ========================================================
+            // ABAS LATERAIS
+            // ========================================================
+
+            CreateGuildTabs();
 
             // ========================================================
             // CABEÇALHO
             // ========================================================
+
+            _calendarTitleTexture =
+                ContentsManager.GetTexture(
+                    "titleCalendar.png",
+                    null
+                );
+
+            _calendarTitle =
+                new Image
+                {
+                    Texture =
+                        _calendarTitleTexture,
+
+                    Location =
+                        new Point(
+                            20,
+                            0
+                        ),
+
+                    Size =
+                        new Point(
+                            348,
+                            36
+                        ),
+
+                    Parent =
+                        _guildCalendarView,
+
+                    ZIndex =
+                        20
+                };
 
             _calendarPeriod =
                 new Label
@@ -427,20 +471,17 @@ namespace SociedadeDoDragao
                     Text =
                         "Período: carregando...",
 
-                    Location =
-                        new Point(
-                            25,
-                            14
-                        ),
-
                     AutoSizeWidth =
                         true,
 
+                    AutoSizeHeight =
+                        true,
+
                     Parent =
-                        _calendarWindow,
+                        _guildCalendarView,
 
                     Font =
-                        GameService.Content.DefaultFont18,
+                        GameService.Content.DefaultFont16,
 
                     TextColor =
                         Color.White,
@@ -458,17 +499,14 @@ namespace SociedadeDoDragao
                     Text =
                         "Última atualização: carregando...",
 
-                    Location =
-                        new Point(
-                            25,
-                            43
-                        ),
-
                     AutoSizeWidth =
                         true,
 
+                    AutoSizeHeight =
+                        true,
+
                     Parent =
-                        _calendarWindow,
+                        _guildCalendarView,
 
                     Font =
                         GameService.Content.DefaultFont14,
@@ -487,12 +525,12 @@ namespace SociedadeDoDragao
                 new Label
                 {
                     Text =
-                        "Atenção: os eventos podem sofrer alterações.",
+                        "",
 
                     Location =
                         new Point(
-                            0,
-                            20
+                            20,
+                            34
                         ),
 
                     AutoSizeWidth =
@@ -505,10 +543,10 @@ namespace SociedadeDoDragao
                         true,
 
                     Parent =
-                        _calendarWindow,
+                        _guildCalendarView,
 
                     Font =
-                        GameService.Content.DefaultFont16,
+                        GameService.Content.DefaultFont14,
 
                     TextColor =
                         Color.LightGray,
@@ -519,6 +557,8 @@ namespace SociedadeDoDragao
                     ZIndex =
                         20
                 };
+
+            PositionCalendarHeader();
 
             // ========================================================
             // VIEWPORT
@@ -540,7 +580,7 @@ namespace SociedadeDoDragao
                         ),
 
                     Parent =
-                        _calendarWindow,
+                        _guildCalendarView,
 
                     ShowBorder =
                         false,
@@ -569,7 +609,7 @@ namespace SociedadeDoDragao
                         ),
 
                     Parent =
-                        _calendarWindow,
+                        _guildCalendarView,
 
                     BackgroundColor =
                         Color.FromNonPremultiplied(
@@ -593,9 +633,12 @@ namespace SociedadeDoDragao
             _weekdayColumn =
                 new Panel
                 {
+                    // A coluna é um overlay FIXO, irmão do viewport.
+                    // Assim ela fica acima de toda a árvore do calendário
+                    // e nunca pode ser coberta pela imagem.
                     Location =
                         new Point(
-                            WeekdayColumnLeft,
+                            ViewportLeft,
                             ViewportTop
                         ),
 
@@ -605,8 +648,11 @@ namespace SociedadeDoDragao
                             500
                         ),
 
+                    // Importante: o overlay fica como filho direto da view,
+                    // no mesmo nível do viewport. Isso garante que o ZIndex
+                    // possa colocá-lo acima de toda a imagem do calendário.
                     Parent =
-                        _calendarWindow,
+                        _guildCalendarView,
 
                     ShowBorder =
                         false,
@@ -615,7 +661,7 @@ namespace SociedadeDoDragao
                         true,
 
                     ZIndex =
-                        15
+                        300
                 };
 
             CreateWeekdayLabels();
@@ -681,7 +727,7 @@ namespace SociedadeDoDragao
                         "Agora (Brasil)",
 
                     Parent =
-                        _calendarWindow,
+                        _guildCalendarView,
 
                     Font =
                         GameService.Content.DefaultFont16,
@@ -787,6 +833,36 @@ namespace SociedadeDoDragao
                 };
 
             // ========================================================
+            // MENSAGEM DO DIA
+            // ========================================================
+
+            _dailyMessageImage =
+                new Image
+                {
+                    Location =
+                        new Point(
+                            CalendarContentLeft,
+                            15
+                        ),
+
+                    Size =
+                        new Point(
+                            600,
+                            600
+                        ),
+
+                    Parent =
+                        _guildDailyMessageView,
+
+                    Visible =
+                        false,
+
+                    ZIndex =
+                        10
+                };
+
+
+            // ========================================================
             // RESPONSIVIDADE
             // ========================================================
 
@@ -795,13 +871,14 @@ namespace SociedadeDoDragao
                 {
                     ResizeCalendarViewport();
 
-                    PositionCalendarWarning();
+                    PositionCalendarHeader();
 
                     ResizeCalendarImage();
 
                     ResizeWeekdayColumn();
                     UpdateTodayWeekdayHighlight();
                     UpdateTodayHighlight();
+                    FitDailyMessageImage();
 
                     if (!_calendarUserHasDragged)
                     {
@@ -813,7 +890,7 @@ namespace SociedadeDoDragao
 
             ResizeCalendarViewport();
 
-            PositionCalendarWarning();
+            PositionCalendarHeader();
 
             ResizeCalendarImage();
 
@@ -840,6 +917,138 @@ namespace SociedadeDoDragao
             Logger.Info(
                 "Sociedade do Dragão carregado com sucesso!"
             );
+        }
+
+        // ============================================================
+        // RECURSOS DA GUILD / ABAS LATERAIS
+        // ============================================================
+
+        private void ShowGuildResourcesWindow()
+        {
+            if (_guildResourcesWindow == null)
+            {
+                return;
+            }
+
+            _calendarUserHasDragged = false;
+            _guildResourcesWindow.Show();
+            SetGuildTab(0);
+
+            if (
+                _calendarOriginalWidth > 0 &&
+                _calendarOriginalHeight > 0
+            )
+            {
+                CenterCalendarOnCurrentTime();
+            }
+
+            _ = LoadCalendarAsync();
+        }
+
+        private void CreateGuildTabs()
+        {
+            if (_calendarWindow == null)
+            {
+                return;
+            }
+
+            _guildCalendarView = new Panel
+            {
+                Size = _calendarWindow.ContentRegion.Size,
+                ShowBorder = false,
+                ClipsBounds = true
+            };
+
+            _guildDailyMessageView = new Panel
+            {
+                Size = _calendarWindow.ContentRegion.Size,
+                ShowBorder = false,
+                ClipsBounds = true
+            };
+
+            _guildCalendarTab =
+                new Tab(
+                    _calendarTabIcon,
+                    () => new PanelView(_guildCalendarView),
+                    "Calendário"
+                );
+
+            _guildDailyMessageTab =
+                new Tab(
+                    _iconTexture,
+                    () => new PanelView(_guildDailyMessageView),
+                    "Mensagem do Dia"
+                );
+
+            _calendarWindow.Tabs.Add(_guildCalendarTab);
+            _calendarWindow.Tabs.Add(_guildDailyMessageTab);
+
+            _calendarWindow.TabChanged +=
+                (sender, e) =>
+                {
+                    if (e.NewValue == _guildCalendarTab)
+                    {
+                        _calendarUserHasDragged = false;
+
+                        if (
+                            _calendarOriginalWidth > 0 &&
+                            _calendarOriginalHeight > 0
+                        )
+                        {
+                            CenterCalendarOnCurrentTime();
+                        }
+
+                        _ = LoadCalendarAsync();
+                    }
+                    else if (e.NewValue == _guildDailyMessageTab)
+                    {
+                        _ = LoadDailyMessageAsync();
+                    }
+                };
+
+            _calendarWindow.Resized +=
+                (sender, e) =>
+                {
+                    ResizeTabViewPanels();
+                };
+
+            _calendarWindow.SelectedTab = _guildCalendarTab;
+        }
+
+        private void ResizeTabViewPanels()
+        {
+            if (_calendarWindow != null)
+            {
+                Point size = _calendarWindow.ContentRegion.Size;
+
+                if (_guildCalendarView != null)
+                    _guildCalendarView.Size = size;
+
+                if (_guildDailyMessageView != null)
+                    _guildDailyMessageView.Size = size;
+            }
+
+            if (_staffResourcesWindow != null)
+            {
+                Point size = _staffResourcesWindow.ContentRegion.Size;
+
+                if (_staffRaffleContent != null)
+                    _staffRaffleContent.Size = size;
+
+                if (_staffQuickMessagesContent != null)
+                    _staffQuickMessagesContent.Size = size;
+            }
+        }
+
+        private void SetGuildTab(int tabIndex)
+        {
+            if (_calendarWindow == null)
+                return;
+
+            _calendarWindow.SelectedTab =
+                tabIndex == 0
+                    ? _guildCalendarTab
+                    : _guildDailyMessageTab;
         }
 
         // ============================================================
@@ -935,29 +1144,62 @@ namespace SociedadeDoDragao
             PositionWeekdayLabels();
         }
 
-        private void PositionCalendarWarning()
+        private void PositionCalendarHeader()
         {
-            if (_calendarWindow == null || _calendarWarning == null)
+            if (
+                _calendarWindow == null ||
+                _calendarTitle == null ||
+                _calendarPeriod == null ||
+                _calendarStatus == null ||
+                _calendarWarning == null
+            )
             {
                 return;
             }
 
-            int rightMargin = 25;
+            const int leftMargin = ContentPadding;
+            const int rightMargin = ContentPadding;
 
-            int x =
-                Math.Max(
-                    0,
-                    _calendarWindow.ContentRegion.Width -
-                    _calendarWarning.Width -
-                    rightMargin
+            _calendarTitle.Location =
+                new Point(
+                    leftMargin,
+                    2
                 );
+
 
             _calendarWarning.Location =
                 new Point(
-                    x,
-                    20
+                    leftMargin,
+                    28
+                );
+
+            int rightWidth =
+                Math.Max(
+                    _calendarPeriod.Width,
+                    _calendarStatus.Width
+                );
+
+            int rightX =
+                Math.Max(
+                    leftMargin,
+                    _calendarWindow.ContentRegion.Width -
+                    rightWidth -
+                    rightMargin
+                );
+
+            _calendarPeriod.Location =
+                new Point(
+                    rightX,
+                    2
+                );
+
+            _calendarStatus.Location =
+                new Point(
+                    rightX,
+                    28
                 );
         }
+
 
         private void PositionWeekdayLabels()
         {
@@ -1008,8 +1250,16 @@ namespace SociedadeDoDragao
                 imageCoordinateScale *
                 _calendarScale;
 
+            // A coluna fica fixa no topo do viewport; portanto o deslocamento
+            // vertical da imagem precisa ser aplicado diretamente ao label.
+            int imageTop =
+                _calendarImage != null
+                    ? _calendarImage.Location.Y
+                    : 0;
+
             int y =
                 (int)(
+                    imageTop +
                     scaledCenterY -
                     label.Height / 2.0f
                 );
@@ -1086,12 +1336,14 @@ namespace SociedadeDoDragao
             int width =
                 Math.Max(
                     1,
-                    _calendarWindow.ContentRegion.Width - 30
+                    _calendarWindow.ContentRegion.Width -
+                    ContentPadding -
+                    ContentPadding
                 );
 
             _todayHighlight.Location =
                 new Point(
-                    15,
+                    ContentPadding,
                     y
                 );
 
@@ -1454,9 +1706,11 @@ namespace SociedadeDoDragao
                 return;
             }
 
+            // O painel é um overlay irmão do viewport.
+            // Ele permanece exatamente sobre a faixa esquerda do viewport.
             _weekdayColumn.Location =
                 new Point(
-                    WeekdayColumnLeft,
+                    ViewportLeft,
                     ViewportTop
                 );
 
@@ -1466,7 +1720,7 @@ namespace SociedadeDoDragao
                     height
                 );
 
-            UpdateWeekdayColumnPosition();
+            PositionWeekdayLabels();
         }
 
         private void UpdateWeekdayColumnPosition()
@@ -1479,25 +1733,13 @@ namespace SociedadeDoDragao
                 return;
             }
 
-            // A coluna acompanha exatamente a altura da imagem,
-            // mantendo o conjunto centralizado dentro do viewport.
-            int imageTop =
-                _calendarImage.Location.Y;
-
-            int imageHeight =
-                _calendarImage.Height;
-
+            // A coluna é um overlay FIXO sobre o viewport.
+            // Ela nunca recebe o X/Y da imagem e nunca participa do arraste.
+            // Somente os labels usam imageTop para acompanhar as linhas dos dias.
             _weekdayColumn.Location =
                 new Point(
-                    WeekdayColumnLeft,
-                    ViewportTop +
-                    imageTop
-                );
-
-            _weekdayColumn.Size =
-                new Point(
-                    WeekdayColumnWidth,
-                    imageHeight
+                    ViewportLeft,
+                    ViewportTop
                 );
 
             PositionWeekdayLabels();
@@ -1822,113 +2064,21 @@ namespace SociedadeDoDragao
 
         private void ShowDailyMessageWindow()
         {
-            if (_dailyMessageWindow == null)
+            if (_guildResourcesWindow == null)
             {
-                CreateDailyMessageWindow();
+                return;
             }
 
-            _dailyMessageWindow.Show();
+            _guildResourcesWindow.Show();
+            SetGuildTab(1);
             _ = LoadDailyMessageAsync();
         }
 
         private void CreateDailyMessageWindow()
         {
-            int screenWidth =
-                GameService.Graphics.SpriteScreen.Width;
-
-            int screenHeight =
-                GameService.Graphics.SpriteScreen.Height;
-
-            const int windowWidth = 660;
-            const int windowHeight = 680;
-
-            var windowBackground =
-                AsyncTexture2D.FromAssetId(155985);
-
-            _dailyMessageWindow =
-                new StandardWindow(
-                    windowBackground,
-                    new Rectangle(
-                        25,
-                        26,
-                        900,
-                        700
-                    ),
-                    new Rectangle(
-                        40,
-                        50,
-                        880,
-                        650
-                    ),
-                    new Point(
-                        windowWidth,
-                        windowHeight
-                    ))
-                {
-                    Parent =
-                        GameService.Graphics.SpriteScreen,
-
-                    Title =
-                        "Mensagem do Dia",
-
-                    Subtitle =
-                        "Sociedade do Dragão [BR]",
-
-                    Emblem =
-                        _iconTexture,
-
-                    Location =
-                        new Point(
-                            Math.Max(
-                                0,
-                                (screenWidth - windowWidth) / 2
-                            ),
-                            Math.Max(
-                                0,
-                                (screenHeight - windowHeight) / 2
-                            )
-                        ),
-
-                    CanResize =
-                        true,
-
-                    SavesSize =
-                        true,
-
-                    SavesPosition =
-                        true,
-
-                    Id =
-                        "SociedadeDoDragao_MensagemDoDia"
-                };
-
-            _dailyMessageImage =
-                new Image
-                {
-                    Location =
-                        new Point(
-                            30,
-                            30
-                        ),
-
-                    Size =
-                        new Point(
-                            600,
-                            600
-                        ),
-
-                    Parent =
-                        _dailyMessageWindow,
-
-                    ZIndex =
-                        10
-                };
-
-            _dailyMessageWindow.Resized +=
-                (sender, e) =>
-                {
-                    FitDailyMessageImage();
-                };
+            // A Mensagem do Dia agora faz parte da janela de Recursos da Guild.
+            // O método é mantido apenas para compatibilidade com a estrutura
+            // anterior do módulo.
         }
 
         private async Task LoadDailyMessageAsync()
@@ -2231,7 +2381,7 @@ namespace SociedadeDoDragao
         private void FitDailyMessageImage()
         {
             if (
-                _dailyMessageWindow == null ||
+                _calendarWindow == null ||
                 _dailyMessageImage == null
             )
             {
@@ -2239,20 +2389,42 @@ namespace SociedadeDoDragao
             }
 
             // As artes da Mensagem do Dia são padronizadas em 800x800
-            // e são exibidas sempre em 600x600, sem redimensionamento
-            // conforme a janela.
-            _dailyMessageImage.Size =
-                new Point(
-                    600,
-                    600
+            // e são exibidas sempre em 600x600.
+            const int imageSize = 600;
+
+            int availableWidth =
+                Math.Max(
+                    1,
+                    _calendarWindow.ContentRegion.Width -
+                    CalendarContentLeft
                 );
 
-            // A janela foi dimensionada para deixar uma margem de
-            // aproximadamente 30 px em cada lado da imagem.
+            int x =
+                CalendarContentLeft +
+                Math.Max(
+                    0,
+                    (availableWidth - imageSize) / 2
+                );
+
+            int y =
+                Math.Max(
+                    10,
+                    (
+                        _calendarWindow.ContentRegion.Height -
+                        imageSize
+                    ) / 2
+                );
+
+            _dailyMessageImage.Size =
+                new Point(
+                    imageSize,
+                    imageSize
+                );
+
             _dailyMessageImage.Location =
                 new Point(
-                    30,
-                    30
+                    x,
+                    y
                 );
         }
 
@@ -2640,12 +2812,7 @@ namespace SociedadeDoDragao
 
                 _staffPinWindow.Visible = false;
 
-                // Habilita o submenu somente depois que o PIN foi validado.
-                EnsureStaffMenu();
-
-                // Reabre o menu principal para que o usuário possa simplesmente
-                // passar o mouse sobre "Recursos da Staff" e abrir o submenu.
-                _guildMenu.Show(_cornerIcon);
+                ShowStaffResourcesWindow();
             }
             else
             {
@@ -2664,49 +2831,149 @@ namespace SociedadeDoDragao
             }
         }
 
-        private void EnsureStaffMenu()
-        {
-            if (_staffMenu != null)
-            {
-                if (_staffMenuItem != null)
-                {
-                    _staffMenuItem.Submenu = _staffMenu;
-                }
+        // ============================================================
+        // RECURSOS DA STAFF / ABAS LATERAIS
+        // ============================================================
 
-                return;
+        private void ShowStaffResourcesWindow()
+        {
+            if (_staffResourcesWindow == null)
+            {
+                CreateStaffResourcesWindow();
             }
 
-            _staffMenu =
-                new ContextMenuStrip();
+            _staffResourcesWindow.Show();
+            SetStaffTab(0);
+        }
 
-            var lotteryMenuItem =
-                _staffMenu.AddMenuItem(
-                    "Sorteador de Participantes"
-                );
+        private void CreateStaffResourcesWindow()
+        {
+            int screenWidth =
+                GameService.Graphics.SpriteScreen.Width;
 
-            lotteryMenuItem.Click +=
-                (sender, e) =>
+            int screenHeight =
+                GameService.Graphics.SpriteScreen.Height;
+
+            const int windowWidth = 1000;
+            const int windowHeight = 620;
+
+            var windowBackground =
+                AsyncTexture2D.FromAssetId(155985);
+
+            _staffResourcesWindow =
+                new TabbedWindow2(
+                    windowBackground,
+                    new Rectangle(
+                        40,
+                        26,
+                        913,
+                        691
+                    ),
+                    new Rectangle(
+                        90,
+                        71,
+                        819,
+                        605
+                    ),
+                    new Point(
+                        windowWidth,
+                        windowHeight
+                    ))
                 {
-                    ShowRaffleWindow();
+                    Parent =
+                        GameService.Graphics.SpriteScreen,
+
+                    Title =
+                        "Recursos da Staff",
+
+                    Subtitle =
+                        "Sociedade do Dragão [BR]",
+
+                    Emblem =
+                        _iconTexture,
+
+                    Location =
+                        new Point(
+                            Math.Max(
+                                0,
+                                (screenWidth - windowWidth) / 2
+                            ),
+                            Math.Max(
+                                0,
+                                (screenHeight - windowHeight) / 2
+                            )
+                        ),
+
+                    CanResize =
+                        false,
+
+                    SavesPosition =
+                        true,
+
+                    Id =
+                        "SociedadeDoDragao_RecursosStaff"
                 };
 
-            var quickMessagesMenuItem =
-                _staffMenu.AddMenuItem(
+            _staffResourcesWindow.Hidden +=
+                (sender, e) =>
+                {
+                    ClearRaffleData();
+                };
+
+            // Os conteúdos das abas são criados como painéis independentes.
+            // O TabbedWindow2 os hospeda automaticamente através do IView.
+            CreateQuickMessagesWindow();
+            CreateRaffleWindow();
+
+            _staffRaffleView = _staffRaffleContent;
+            _staffQuickMessagesView = _staffQuickMessagesContent;
+
+            _staffRaffleTab =
+                new Tab(
+                    _iconTexture,
+                    () => new PanelView(_staffRaffleView),
+                    "Sorteador"
+                );
+
+            _staffQuickMessagesTab =
+                new Tab(
+                    _iconTexture,
+                    () => new PanelView(_staffQuickMessagesView),
                     "Mensagens Rápidas"
                 );
 
-            quickMessagesMenuItem.Click +=
+            _staffResourcesWindow.Tabs.Add(_staffRaffleTab);
+            _staffResourcesWindow.Tabs.Add(_staffQuickMessagesTab);
+
+            _staffResourcesWindow.TabChanged +=
                 (sender, e) =>
                 {
-                    ShowQuickMessagesWindow();
+                    if (e.NewValue == _staffQuickMessagesTab)
+                    {
+                        _ = LoadQuickMessagesAsync();
+                    }
                 };
 
-            if (_staffMenuItem != null)
-            {
-                _staffMenuItem.Submenu = _staffMenu;
-            }
+            _staffResourcesWindow.Resized +=
+                (sender, e) =>
+                {
+                    ResizeTabViewPanels();
+                    CenterRaffleResultLabels();
+                };
+
+            _staffResourcesWindow.SelectedTab = _staffRaffleTab;
         }
 
+        private void SetStaffTab(int tabIndex)
+        {
+            if (_staffResourcesWindow == null)
+                return;
+
+            _staffResourcesWindow.SelectedTab =
+                tabIndex == 0
+                    ? _staffRaffleTab
+                    : _staffQuickMessagesTab;
+        }
 
         // ============================================================
         // MENSAGENS RÁPIDAS
@@ -2714,14 +2981,13 @@ namespace SociedadeDoDragao
 
         private void ShowQuickMessagesWindow()
         {
-            if (_quickMessagesWindow == null)
+            ShowStaffResourcesWindow();
+
+            if (_staffResourcesWindow != null)
             {
-                CreateQuickMessagesWindow();
+                SetStaffTab(1);
+                _ = LoadQuickMessagesAsync();
             }
-
-            _quickMessagesWindow.Show();
-
-            _ = LoadQuickMessagesAsync();
         }
 
         private async Task LoadQuickMessagesAsync()
@@ -2762,92 +3028,50 @@ namespace SociedadeDoDragao
 
         private void CreateQuickMessagesWindow()
         {
-            int screenWidth =
-                GameService.Graphics.SpriteScreen.Width;
+            if (_staffResourcesWindow == null)
+            {
+                return;
+            }
 
-            int screenHeight =
-                GameService.Graphics.SpriteScreen.Height;
-
-            const int windowWidth = 760;
-            const int windowHeight = 560;
-
-            var windowBackground =
-                AsyncTexture2D.FromAssetId(155985);
-
-            _quickMessagesWindow =
-                new StandardWindow(
-                    windowBackground,
-                    new Rectangle(
-                        25,
-                        26,
-                        900,
-                        700
-                    ),
-                    new Rectangle(
-                        40,
-                        50,
-                        880,
-                        650
-                    ),
-                    new Point(
-                        windowWidth,
-                        windowHeight
-                    ))
+            _staffQuickMessagesContent =
+                new Panel
                 {
-                    Parent =
-                        GameService.Graphics.SpriteScreen,
-
-                    Title =
-                        "Mensagens Rápidas",
-
-                    Subtitle =
-                        "Recursos da Staff",
-
-                    Emblem =
-                        _iconTexture,
-
                     Location =
-                        new Point(
-                            Math.Max(
-                                0,
-                                (screenWidth - windowWidth) / 2
-                            ),
-                            Math.Max(
-                                0,
-                                (screenHeight - windowHeight) / 2
-                            )
-                        ),
+                        Point.Zero,
 
-                    CanResize =
+                    Size =
+                        _staffResourcesWindow.ContentRegion.Size,
+
+                    Parent =
+                        null,
+
+                    ShowBorder =
                         false,
 
-                    SavesPosition =
-                        true,
-
-                    Id =
-                        "SociedadeDoDragao_MensagensRapidas"
+                    ZIndex =
+                        5
                 };
 
             CreateQuickMessageRow(
                 "Recrutamento",
-                25,
-                5,
+                20,
+                15,
                 out _quickMessageRecruitmentLabel,
                 () => CopyToClipboard(_quickMessageRecruitment)
             );
 
             CreateQuickMessageRow(
                 "Guild Mission",
-                25,
-                160,
+                20,
+                170,
                 out _quickMessageGuildMissionLabel,
                 () => CopyToClipboard(_quickMessageGuildMission)
             );
 
             CreateQuickMessageRow(
                 "Reset",
-                25,
-                315,
+                20,
+                325,
                 out _quickMessageResetLabel,
                 () => CopyToClipboard(_quickMessageReset)
             );
@@ -2866,7 +3090,7 @@ namespace SociedadeDoDragao
                 Location = new Point(x, y),
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Parent = _quickMessagesWindow,
+                Parent = _staffQuickMessagesContent,
                 Font = GameService.Content.DefaultFont18,
                 TextColor = Color.White,
                 StrokeText = false,
@@ -2878,7 +3102,7 @@ namespace SociedadeDoDragao
                 {
                     Location = new Point(x, y + 30),
                     Size = new Point(590, 100),
-                    Parent = _quickMessagesWindow,
+                    Parent = _staffQuickMessagesContent,
                     BackgroundColor = Color.FromNonPremultiplied(245, 245, 245, 255),
                     ShowBorder = true,
                     ZIndex = 20
@@ -2907,7 +3131,7 @@ namespace SociedadeDoDragao
                     Text = "Copiar",
                     Location = new Point(x + 605, y + 30),
                     Size = new Point(100, 48),
-                    Parent = _quickMessagesWindow,
+                    Parent = _staffQuickMessagesContent,
                     ZIndex = 20
                 };
 
@@ -2918,7 +3142,7 @@ namespace SociedadeDoDragao
                     Location = new Point(x + 628, y + 82),
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Parent = _quickMessagesWindow,
+                    Parent = _staffQuickMessagesContent,
                     Font = GameService.Content.DefaultFont14,
                     TextColor = new Color(255, 225, 0),
                     StrokeText = false,
@@ -3092,89 +3316,38 @@ namespace SociedadeDoDragao
 
         private void ShowRaffleWindow()
         {
-            if (_raffleWindow == null)
+            ShowStaffResourcesWindow();
+
+            if (_staffResourcesWindow != null)
             {
-                CreateRaffleWindow();
+                SetStaffTab(0);
             }
-
-            _raffleWindow.Show();
-
         }
 
         private void CreateRaffleWindow()
         {
-            int screenWidth =
-                GameService.Graphics.SpriteScreen.Width;
+            if (_staffResourcesWindow == null)
+            {
+                return;
+            }
 
-            int screenHeight =
-                GameService.Graphics.SpriteScreen.Height;
-
-            const int windowWidth = 900;
-            const int windowHeight = 620;
-
-            var windowBackground =
-                AsyncTexture2D.FromAssetId(155985);
-
-            _raffleWindow =
-                new StandardWindow(
-                    windowBackground,
-                    new Rectangle(
-                        25,
-                        26,
-                        900,
-                        700
-                    ),
-                    new Rectangle(
-                        40,
-                        50,
-                        880,
-                        650
-                    ),
-                    new Point(
-                        windowWidth,
-                        windowHeight
-                    ))
+            _staffRaffleContent =
+                new Panel
                 {
-                    Parent =
-                        GameService.Graphics.SpriteScreen,
-
-                    Title =
-                        "Sorteador de Participantes",
-
-                    Subtitle =
-                        "Recursos da Staff",
-
-                    Emblem =
-                        _iconTexture,
-
                     Location =
-                        new Point(
-                            Math.Max(
-                                0,
-                                (screenWidth - windowWidth) / 2
-                            ),
-                            Math.Max(
-                                0,
-                                (screenHeight - windowHeight) / 2
-                            )
-                        ),
+                        Point.Zero,
 
-                    CanResize =
+                    Size =
+                        _staffResourcesWindow.ContentRegion.Size,
+
+                    Parent =
+                        null,
+
+                    ShowBorder =
                         false,
 
-                    SavesPosition =
-                        true,
-
-                    Id =
-                        "SociedadeDoDragao_Sorteador"
-                };
-
-            // Ao fechar a janela, o sorteio é encerrado e todos os
-            // participantes/resultados são apagados.
-            _raffleWindow.Hidden +=
-                (sender, e) =>
-                {
-                    ClearRaffleData();
+                    ZIndex =
+                        5
                 };
 
             // --------------------------------------------------------
@@ -3183,10 +3356,10 @@ namespace SociedadeDoDragao
 
             const int columns = 3;
 
-            const int startX = 35;
+            const int startX = 20;
             const int startY = 18;
 
-            const int columnWidth = 270;
+            const int columnWidth = 235;
             const int rowHeight = 55;
 
             for (int i = 0; i < _raffleInputs.Length; i++)
@@ -3221,7 +3394,7 @@ namespace SociedadeDoDragao
                             true,
 
                         Parent =
-                            _raffleWindow,
+                            _staffRaffleContent,
 
                         Font =
                             GameService.Content.DefaultFont14,
@@ -3246,26 +3419,21 @@ namespace SociedadeDoDragao
                             ),
 
                         Width =
-                            215,
+                            180,
 
                         Parent =
-                            _raffleWindow,
+                            _staffRaffleContent,
 
                         ZIndex =
                             20
                     };
 
-                // Camada visual usada quando o participante já foi sorteado.
-                // Ela fica sobre o campo para deixar o estado indisponível
-                // muito mais evidente.
                 _raffleDisabledOverlays[i] =
                     new Panel
                     {
-                        // O indicador fica no lado direito do input,
-                        // deixando o nome do participante legível.
                         Location =
                             new Point(
-                                x + 32 + 133,
+                                x + 32 + 95,
                                 y
                             ),
 
@@ -3276,7 +3444,7 @@ namespace SociedadeDoDragao
                             ),
 
                         Parent =
-                            _raffleWindow,
+                            _staffRaffleContent,
 
                         BackgroundColor =
                             Color.FromNonPremultiplied(
@@ -3358,7 +3526,7 @@ namespace SociedadeDoDragao
                         true,
 
                     Parent =
-                        _raffleWindow,
+                        _staffRaffleContent,
 
                     Font =
                         GameService.Content.DefaultFont18,
@@ -3392,7 +3560,7 @@ namespace SociedadeDoDragao
                         true,
 
                     Parent =
-                        _raffleWindow,
+                        _staffRaffleContent,
 
                     Font =
                         GameService.Content.DefaultFont18,
@@ -3419,8 +3587,14 @@ namespace SociedadeDoDragao
 
             const int raffleButtonsY = 405;
 
-            // Os dois botões ficam centralizados na janela.
-            const int raffleButtonsStartX = 325;
+            int raffleButtonsStartX =
+                Math.Max(
+                    0,
+                    (
+                        _staffRaffleContent.Width -
+                        250
+                    ) / 2
+                );
 
             _raffleDrawButton =
                 new StandardButton
@@ -3441,7 +3615,7 @@ namespace SociedadeDoDragao
                         ),
 
                     Parent =
-                        _raffleWindow,
+                        _staffRaffleContent,
 
                     ZIndex =
                         20
@@ -3466,7 +3640,7 @@ namespace SociedadeDoDragao
                         ),
 
                     Parent =
-                        _raffleWindow,
+                        _staffRaffleContent,
 
                     ZIndex =
                         20
@@ -3483,7 +3657,6 @@ namespace SociedadeDoDragao
                 {
                     ResetRaffle();
                 };
-
         }
 
         private void CenterRaffleResultLabels()
@@ -3494,7 +3667,9 @@ namespace SociedadeDoDragao
             }
 
             int centerX =
-                _raffleWindow.ContentRegion.Width / 2;
+                _staffRaffleContent != null
+                    ? _staffRaffleContent.Width / 2
+                    : 0;
 
             if (_raffleResultLabel != null)
             {
@@ -3724,6 +3899,46 @@ namespace SociedadeDoDragao
             IntPtr hMem
         );
 
+        private sealed class PanelView : IView
+        {
+            private readonly Panel _panel;
+
+            public event EventHandler<EventArgs> Loaded;
+            public event EventHandler<EventArgs> Built;
+            public event EventHandler<EventArgs> Unloaded;
+
+            public PanelView(Panel panel)
+            {
+                _panel = panel;
+            }
+
+            public Task<bool> DoLoad(IProgress<string> progress)
+            {
+                return Task.FromResult(_panel != null);
+            }
+
+            public void DoBuild(Container buildPanel)
+            {
+                if (_panel == null || buildPanel == null)
+                    return;
+
+                _panel.Parent = buildPanel;
+                _panel.Location = Point.Zero;
+                _panel.Size = buildPanel.ContentRegion.Size;
+
+                Built?.Invoke(this, EventArgs.Empty);
+                Loaded?.Invoke(this, EventArgs.Empty);
+            }
+
+            public void DoUnload()
+            {
+                if (_panel != null)
+                    _panel.Parent = null;
+
+                Unloaded?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
         // ============================================================
         // DESCARREGAR
         // ============================================================
@@ -3736,14 +3951,33 @@ namespace SociedadeDoDragao
 
             _cornerIcon?.Dispose();
             _guildMenu?.Dispose();
-            _raffleWindow?.Dispose();
-            _calendarWindow?.Dispose();
+            _staffResourcesWindow?.Dispose();
+            _guildResourcesWindow?.Dispose();
             _calendarTexture?.Dispose();
+            _calendarTabIcon?.Dispose();
             _iconTexture?.Dispose();
             _httpClient?.Dispose();
 
             _cornerIcon = null;
             _guildMenu = null;
+            _guildResourcesWindow = null;
+            _staffResourcesWindow = null;
+            _guildTabSidebar = null;
+            _guildCalendarTab = null;
+            _guildDailyMessageTab = null;
+            _guildCalendarTabLabel = null;
+            _guildDailyMessageTabLabel = null;
+            _guildCalendarView = null;
+            _guildDailyMessageView = null;
+            _staffTabSidebar = null;
+            _staffRaffleTab = null;
+            _staffQuickMessagesTab = null;
+            _staffRaffleContent = null;
+            _staffQuickMessagesContent = null;
+            _staffRaffleTabLabel = null;
+            _staffQuickMessagesTabLabel = null;
+            _staffRaffleView = null;
+            _staffQuickMessagesView = null;
             _calendarWindow = null;
             _calendarViewport = null;
             _weekdayColumn = null;
@@ -3755,6 +3989,9 @@ namespace SociedadeDoDragao
             _currentTimeLineRawTexture?.Dispose();
             _currentTimeLineRawTexture = null;
             _currentTimeTimer = null;
+            _calendarTitle = null;
+            _calendarTitleTexture?.Dispose();
+            _calendarTitleTexture = null;
             _calendarPeriod = null;
             _calendarStatus = null;
             _calendarWarning = null;
@@ -3764,8 +4001,6 @@ namespace SociedadeDoDragao
             _staffPinSubtitle = null;
             _staffPinCloseButton = null;
             _staffPinWindow = null;
-            _staffMenu = null;
-            _staffMenuItem = null;
             _staffResourcesEnabled = false;
             _quickMessagesWindow = null;
             _quickMessageRecruitmentLabel = null;
@@ -3774,7 +4009,6 @@ namespace SociedadeDoDragao
             _quickMessageRecruitment = string.Empty;
             _quickMessageGuildMission = string.Empty;
             _quickMessageReset = string.Empty;
-            _dailyMessageWindow?.Dispose();
             _dailyMessageWindow = null;
             _dailyMessageImage = null;
             _dailyMessageTexture = null;
