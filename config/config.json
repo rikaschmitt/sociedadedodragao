@@ -95,6 +95,18 @@
     "Sara": {
       "pontos": "25",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarSara.png",
+    },
+    "Brendonn": {
+      "pontos": "40",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarBrendonn.png",
+    },
+    "Spar": {
+      "pontos": "65",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarSpar.png",
+    },
+    "Urso": {
+      "pontos": "45",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarUrso.png",
     }
   }
 }
