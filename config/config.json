@@ -91,6 +91,10 @@
     "Tio": {
       "pontos": "55",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarTio.png",
+    },
+    "Sara": {
+      "pontos": "25",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarSara.png",
     }
   }
 }
