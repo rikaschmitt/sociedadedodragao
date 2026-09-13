@@ -45,5 +45,47 @@
     "28": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/img28.jpg",
     "29": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/img29.jpg",
     "30": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/img30.jpg"
-  }
+  },
+  "pontuacaoStaff": {
+    "ultimaAtualizacao": "13/09/2026",
+    "Brócolis": {
+      "pontos": "30",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarBrocolis.png",
+    },
+    "Juh": {
+      "pontos": "20",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarJuh.png",
+    },
+    "Nhow": {
+      "pontos": "10",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarNhow.png",
+    },
+    "Hill": {
+      "pontos": "5",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarHill.png",
+    },
+    "Scooby": {
+      "pontos": "50",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarScooby.png",
+    },
+    "Heltns": {
+      "pontos": "80",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarHeltns.png",
+    },
+    "Arthur": {
+      "pontos": "15",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarArthur.png",
+    },
+    "Senyus": {
+      "pontos": "8",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarSenyus.png",
+    },
+    "Gustavo": {
+      "pontos": "0",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarGustavo.png",
+    },
+    "Guts": {
+      "pontos": "15",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarGuts.png",
+    },
 }
