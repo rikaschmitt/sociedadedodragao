@@ -87,6 +87,10 @@
     "Guts": {
       "pontos": "15",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarGuts.png",
+    },
+    "Tio": {
+      "pontos": "55",
+      "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarTio.png",
     }
   }
 }
