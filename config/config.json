@@ -49,35 +49,35 @@
   "pontuacaoStaff": {
     "ultimaAtualizacao": "13/09/2026",
     "Brócolis": {
-      "pontos": "30",
+      "pontos": "10",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarBrocolis.png",
     },
     "Juh": {
-      "pontos": "20",
+      "pontos": "95",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarJuh.png",
     },
     "Nhow": {
-      "pontos": "10",
+      "pontos": "95",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarNhow.png",
     },
     "Hill": {
-      "pontos": "5",
+      "pontos": "95",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarHill.png",
     },
     "Scooby": {
-      "pontos": "50",
+      "pontos": "95",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarScooby.png",
     },
     "Heltns": {
-      "pontos": "80",
+      "pontos": "95",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarHeltns.png",
     },
     "Arthur": {
-      "pontos": "15",
+      "pontos": "95",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarArthur.png",
     },
     "Senyus": {
-      "pontos": "8",
+      "pontos": "95",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarSenyus.png",
     },
     "Gustavo": {
@@ -85,27 +85,27 @@
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarGustavo.png",
     },
     "Guts": {
-      "pontos": "15",
+      "pontos": "95",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarGuts.png",
     },
     "Tio": {
-      "pontos": "55",
+      "pontos": "95",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarTio.png",
     },
     "Sara": {
-      "pontos": "25",
+      "pontos": "95",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarSara.png",
     },
     "Brendonn": {
-      "pontos": "40",
+      "pontos": "95",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarBrendonn.png",
     },
     "Spar": {
-      "pontos": "65",
+      "pontos": "95",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarSpar.png",
     },
     "Urso": {
-      "pontos": "45",
+      "pontos": "95",
       "avatar": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/avatarUrso.png",
     }
   }
