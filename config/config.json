@@ -2,8 +2,8 @@
   "versao": "1.0.0",
   "calendario": {
     "imagem": "https://raw.githubusercontent.com/rikaschmitt/sociedadedodragao/main/assets/calendario.png",
-    "periodoCalendario": "28/09 a 04/10",
-    "ultimaAtualizacao": "28/09/2026"
+    "periodoCalendario": "05/10 a 11/10",
+    "ultimaAtualizacao": "06/10/2026"
   },
   "sorteio": {
     "mensagemSorteado": "<< Sorteio da Guild >> Conheça o(s) ganhador(es): "
